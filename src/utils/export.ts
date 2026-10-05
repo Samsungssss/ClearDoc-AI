@@ -1,0 +1,304 @@
+import { jsPDF } from 'jspdf';
+import { DocumentAnalysis } from '../types/document';
+
+export function generatePlainTextReport(doc: DocumentAnalysis): string {
+  const divider = '============================================================';
+  const subDivider = '------------------------------------------------------------';
+
+  let report = '';
+  report += `${divider}\n`;
+  report += `CLEARDOC AI - DOCUMENT COMPREHENSION REPORT\n`;
+  report += `${divider}\n\n`;
+
+  report += `DOCUMENT NAME: ${doc.fileName}\n`;
+  report += `DOCUMENT TYPE: ${doc.documentType}\n`;
+  report += `DATE ANALYZED: ${new Date(doc.uploadDate).toLocaleDateString()} ${new Date(doc.uploadDate).toLocaleTimeString()}\n\n`;
+
+  report += `${subDivider}\n`;
+  report += `ONE-SENTENCE SUMMARY:\n`;
+  report += `${subDivider}\n`;
+  report += `${doc.oneSentenceSummary}\n\n`;
+
+  report += `${subDivider}\n`;
+  report += `WHAT THIS DOCUMENT MEANS (PLAIN LANGUAGE):\n`;
+  report += `${subDivider}\n`;
+  report += `${doc.whatItMeans.overview}\n\n`;
+  if (doc.whatItMeans.plainLanguageExplanation?.length > 0) {
+    report += `Key Takeaways:\n`;
+    doc.whatItMeans.plainLanguageExplanation.forEach((point) => {
+      report += `• ${point}\n`;
+    });
+    report += '\n';
+  }
+
+  if (doc.whatItMeans.jargonExplained?.length > 0) {
+    report += `Terminology Clarified:\n`;
+    doc.whatItMeans.jargonExplained.forEach((item) => {
+      report += `• ${item.term}: ${item.simpleExplanation}\n`;
+    });
+    report += '\n';
+  }
+
+  report += `${subDivider}\n`;
+  report += `CRITICAL DEADLINES:\n`;
+  report += `${subDivider}\n`;
+  if (doc.importantInformation.deadlines?.length > 0) {
+    doc.importantInformation.deadlines.forEach((d) => {
+      report += `[${d.isUrgent ? 'URGENT ' : ''}DEADLINE] ${d.title}\n`;
+      report += `  Date: ${d.date}\n`;
+      if (d.consequence) report += `  Consequence if missed: ${d.consequence}\n`;
+      report += '\n';
+    });
+  } else {
+    report += `No explicit hard deadlines identified in document.\n\n`;
+  }
+
+  report += `${subDivider}\n`;
+  report += `FINANCIAL AMOUNTS & FEES:\n`;
+  report += `${subDivider}\n`;
+  if (doc.importantInformation.amounts?.length > 0) {
+    doc.importantInformation.amounts.forEach((a) => {
+      report += `• ${a.label}: ${a.amount} ${a.currency || ''} (${a.isPayableByYou ? 'Payable by you' : 'Informational / Conditional'})\n`;
+      if (a.dueDate) report += `  Due Date: ${a.dueDate}\n`;
+      if (a.paymentMethodOrNotes) report += `  Instructions: ${a.paymentMethodOrNotes}\n`;
+    });
+    report += '\n';
+  } else {
+    report += `No monetary transactions or fee schedules noted.\n\n`;
+  }
+
+  report += `${subDivider}\n`;
+  report += `REQUIRED DOCUMENTS & ATTACHMENTS:\n`;
+  report += `${subDivider}\n`;
+  if (doc.importantInformation.requiredDocuments?.length > 0) {
+    doc.importantInformation.requiredDocuments.forEach((r) => {
+      report += `• ${r.name} - ${r.purpose}\n`;
+    });
+    report += '\n';
+  } else {
+    report += `None specified.\n\n`;
+  }
+
+  report += `${subDivider}\n`;
+  report += `OFFICIAL CONTACT INFORMATION:\n`;
+  report += `${subDivider}\n`;
+  if (doc.importantInformation.contactInformation?.length > 0) {
+    doc.importantInformation.contactInformation.forEach((c) => {
+      report += `• ${c.nameOrEntity} (${c.role})\n`;
+      if (c.phone) report += `  Phone: ${c.phone}\n`;
+      if (c.email) report += `  Email: ${c.email}\n`;
+      if (c.address) report += `  Address: ${c.address}\n`;
+      if (c.website) report += `  Website: ${c.website}\n`;
+    });
+    report += '\n';
+  }
+
+  report += `${subDivider}\n`;
+  report += `REFERENCE NUMBERS:\n`;
+  report += `${subDivider}\n`;
+  if (doc.importantInformation.referenceNumbers?.length > 0) {
+    doc.importantInformation.referenceNumbers.forEach((ref) => {
+      report += `• ${ref.type}: ${ref.value} ${ref.notes ? `(${ref.notes})` : ''}\n`;
+    });
+    report += '\n';
+  }
+
+  report += `${subDivider}\n`;
+  report += `ACTION PLAN (WHAT YOU NEED TO DO):\n`;
+  report += `${subDivider}\n`;
+  if (doc.actionPlan?.length > 0) {
+    doc.actionPlan.forEach((step) => {
+      const mark = step.completed ? '[x]' : '[ ]';
+      report += `${step.stepNumber}. ${mark} ${step.task}\n`;
+      report += `   Details: ${step.details}\n`;
+      if (step.deadline) report += `   Deadline: ${step.deadline}\n`;
+      report += `   Priority: ${step.priority.toUpperCase()}\n\n`;
+    });
+  }
+
+  if (doc.missingInformation?.length > 0) {
+    report += `${subDivider}\n`;
+    report += `MISSING OR AMBIGUOUS INFORMATION TO VERIFY:\n`;
+    report += `${subDivider}\n`;
+    doc.missingInformation.forEach((m) => {
+      report += `• ${m.item}\n`;
+      report += `  Why it matters: ${m.whyItMatters}\n`;
+      report += `  Recommendation: ${m.recommendation}\n\n`;
+    });
+  }
+
+  report += `${divider}\n`;
+  report += `AI COMPREHENSION ADVISORY:\n`;
+  report += `This analysis was generated by ClearDoc AI for informational guidance. While the system extracts information with high fidelity from source documents, users should verify legal, financial, or medical specifics directly with issuing authorities or qualified professionals.\n`;
+  report += `${divider}\n`;
+
+  return report;
+}
+
+export function exportToTxt(doc: DocumentAnalysis): void {
+  const content = generatePlainTextReport(doc);
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const safeName = doc.fileName.replace(/[^a-zA-Z0-9_-]/g, '_');
+  a.download = `ClearDoc_Analysis_${safeName}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+export async function copyToClipboard(doc: DocumentAnalysis): Promise<boolean> {
+  try {
+    const text = generatePlainTextReport(doc);
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (err) {
+    console.error('Failed to copy to clipboard:', err);
+    return false;
+  }
+}
+
+export function exportToPdf(doc: DocumentAnalysis): void {
+  const pdf = new jsPDF({
+    unit: 'pt',
+    format: 'a4',
+  });
+
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 40;
+  const maxLineWidth = pageWidth - margin * 2;
+  let cursorY = 48;
+
+  function checkNewPage(neededSpace = 30) {
+    if (cursorY + neededSpace > pageHeight - margin) {
+      pdf.addPage();
+      cursorY = margin;
+    }
+  }
+
+  // Header Title
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(16);
+  pdf.setTextColor(17, 24, 39);
+  pdf.text('CLEARDOC AI — DOCUMENT COMPREHENSION REPORT', margin, cursorY);
+  cursorY += 18;
+
+  // Metadata
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(9);
+  pdf.setTextColor(107, 114, 128);
+  pdf.text(`Document: ${doc.fileName}   |   Type: ${doc.documentType}   |   Date: ${new Date(doc.uploadDate).toLocaleDateString()}`, margin, cursorY);
+  cursorY += 14;
+
+  pdf.setDrawColor(229, 231, 235);
+  pdf.line(margin, cursorY, pageWidth - margin, cursorY);
+  cursorY += 18;
+
+  // Section 1: Summary
+  checkNewPage(40);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(11);
+  pdf.setTextColor(17, 24, 39);
+  pdf.text('1. SUMMARY & WHAT THIS MEANS', margin, cursorY);
+  cursorY += 14;
+
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(9.5);
+  pdf.setTextColor(55, 65, 81);
+  const summaryLines = pdf.splitTextToSize(doc.oneSentenceSummary || doc.shortSummary, maxLineWidth);
+  pdf.text(summaryLines, margin, cursorY);
+  cursorY += summaryLines.length * 13 + 8;
+
+  // Section 2: Action Plan
+  checkNewPage(40);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(11);
+  pdf.setTextColor(17, 24, 39);
+  pdf.text('2. ACTION PLAN (WHAT YOU NEED TO DO)', margin, cursorY);
+  cursorY += 14;
+
+  doc.actionPlan.forEach((step) => {
+    checkNewPage(35);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(9);
+    pdf.setTextColor(17, 24, 39);
+    const mark = step.completed ? '[DONE] ' : '[TODO] ';
+    pdf.text(`${step.stepNumber}. ${mark}${step.task} ${step.deadline ? `(Due: ${step.deadline})` : ''}`, margin, cursorY);
+    cursorY += 12;
+
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8.5);
+    pdf.setTextColor(75, 85, 99);
+    const detailLines = pdf.splitTextToSize(`   ${step.details}`, maxLineWidth - 10);
+    pdf.text(detailLines, margin, cursorY);
+    cursorY += detailLines.length * 11 + 6;
+  });
+
+  cursorY += 8;
+
+  // Section 3: Deadlines & Amounts
+  checkNewPage(40);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(11);
+  pdf.setTextColor(17, 24, 39);
+  pdf.text('3. IMPORTANT DEADLINES & AMOUNTS', margin, cursorY);
+  cursorY += 14;
+
+  if (doc.importantInformation.deadlines?.length > 0) {
+    doc.importantInformation.deadlines.forEach((d) => {
+      checkNewPage(25);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(9);
+      pdf.setTextColor(17, 24, 39);
+      pdf.text(`Deadline: ${d.title} — ${d.date}`, margin, cursorY);
+      cursorY += 11;
+      if (d.consequence) {
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8.5);
+        pdf.setTextColor(107, 114, 128);
+        const consLines = pdf.splitTextToSize(`Consequence: ${d.consequence}`, maxLineWidth - 10);
+        pdf.text(consLines, margin, cursorY);
+        cursorY += consLines.length * 11 + 4;
+      }
+    });
+  }
+
+  if (doc.importantInformation.amounts?.length > 0) {
+    doc.importantInformation.amounts.forEach((a) => {
+      checkNewPage(25);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(9);
+      pdf.setTextColor(17, 24, 39);
+      pdf.text(`Amount: ${a.label} — ${a.amount} ${a.currency || ''}`, margin, cursorY);
+      cursorY += 11;
+      if (a.paymentMethodOrNotes) {
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8.5);
+        pdf.setTextColor(107, 114, 128);
+        const payLines = pdf.splitTextToSize(`Payment details: ${a.paymentMethodOrNotes}`, maxLineWidth - 10);
+        pdf.text(payLines, margin, cursorY);
+        cursorY += payLines.length * 11 + 4;
+      }
+    });
+  }
+
+  cursorY += 12;
+
+  // Footer Disclaimer
+  checkNewPage(30);
+  pdf.setDrawColor(229, 231, 235);
+  pdf.line(margin, cursorY, pageWidth - margin, cursorY);
+  cursorY += 12;
+
+  pdf.setFont('helvetica', 'italic');
+  pdf.setFontSize(7.5);
+  pdf.setTextColor(156, 163, 175);
+  const disclaimer = 'Informational report generated by ClearDoc AI. Always verify statutory or contractual terms with relevant authorities.';
+  pdf.text(disclaimer, margin, cursorY);
+
+  const safeName = doc.fileName.replace(/[^a-zA-Z0-9_-]/g, '_');
+  pdf.save(`ClearDoc_Report_${safeName}.pdf`);
+}

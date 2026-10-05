@@ -1,0 +1,6 @@
+{
+  "name": "ClearDoc AI",
+  "description": "Professional document comprehension and analysis platform. Turn complex forms, contracts, notices, and official paperwork into clear explanations, verified facts, and actionable checklists.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
